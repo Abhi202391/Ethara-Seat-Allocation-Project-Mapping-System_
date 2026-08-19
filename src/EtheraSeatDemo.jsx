@@ -518,7 +518,10 @@ export default function EtheraSeatDemo() {
                         <td className="px-3 py-2 hidden lg:table-cell text-[#D9CCEE] text-xs">
                           {e.department}<div className="text-[11px] text-[#A99BC4]">{e.role} · joined {e.joiningDate}</div>
                         </td>
-                        <td className="px-3 py-2 hidden md:table-cell text-[#D9CCEE]">{projectById[e.projectId]?.name}</td>
+                        <td className="px-3 py-2 hidden md:table-cell text-[#D9CCEE]">
+                          {projectById[e.projectId]?.name}
+                          {e.projectId != null && <span className="text-[11px] text-[#7A6B96] font-mono"> (ID: {e.projectId})</span>}
+                        </td>
                         <td className="px-3 py-2 hidden sm:table-cell font-mono text-[#D9CCEE]">
                           {seat ? `F${seat.floor}-${seat.seatNumber}` : "—"}
                         </td>
@@ -624,7 +627,10 @@ export default function EtheraSeatDemo() {
             {projectUtilization.map((p) => (
               <div key={p.id} className="rounded-lg border border-[#2E1F47] bg-[#000000] p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="font-semibold">{p.name}</div>
+                  <div className="font-semibold flex items-center gap-2">
+                    {p.name}
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[#2E1F47] text-[#A99BC4]">ID: {p.id}</span>
+                  </div>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-emerald-400/30 text-emerald-300">{p.status}</span>
                 </div>
                 <div className="text-xs text-[#A99BC4] mb-3">Manager: {p.manager}</div>
@@ -730,7 +736,7 @@ export default function EtheraSeatDemo() {
                   <select value={addForm.projectId} onChange={(e) => setAddForm((f) => ({ ...f, projectId: e.target.value }))}
                     className="mt-1 w-full bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm">
                     <option value="">Unassigned</option>
-                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name} (ID: {p.id})</option>)}
                   </select>
                 </div>
               </div>
@@ -813,7 +819,7 @@ export default function EtheraSeatDemo() {
                   <select value={editForm.projectId} onChange={(e) => setEditForm((f) => ({ ...f, projectId: e.target.value }))}
                     className="mt-1 w-full bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm">
                     <option value="">Unassigned</option>
-                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name} (ID: {p.id})</option>)}
                   </select>
                 </div>
               </div>
