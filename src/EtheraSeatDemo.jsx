@@ -47,6 +47,7 @@ function Card({ label, value, icon: Icon, tint, loading }) {
 export default function EtheraSeatDemo() {
   const [tab, setTab] = useState("dashboard");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const [projects, setProjects] = useState([]);
 
@@ -162,7 +163,9 @@ export default function EtheraSeatDemo() {
 
   async function allocateSeat(employeeId) {
     try {
-      await api.allocateSeat(employeeId);
+      const { note } = await api.allocateSeat(employeeId);
+      const empName = employees.find((e) => e.id === employeeId)?.name || "Employee";
+      setNotice(note ? `${empName}: ${note}` : "");
       await Promise.all([loadEmployees(), loadDashboard()]);
     } catch (e) {
       setError(e.message);
@@ -209,7 +212,7 @@ export default function EtheraSeatDemo() {
     setAddSubmitting(true);
     setAddError("");
     try {
-      await api.createEmployee({
+      const { employee, note } = await api.createEmployee({
         name: addForm.name,
         email: addForm.email,
         department: addForm.department,
@@ -218,6 +221,7 @@ export default function EtheraSeatDemo() {
         project_id: addForm.projectId ? Number(addForm.projectId) : null,
         auto_allocate: addForm.autoAllocate,
       });
+      setNotice(note ? `${employee.name}: ${note}` : "");
       setShowAddModal(false);
       setPage(0);
       await Promise.all([loadEmployees(), loadDashboard()]);
@@ -337,6 +341,15 @@ export default function EtheraSeatDemo() {
           <div className="flex items-center justify-between gap-3 rounded-lg border border-rose-400/30 bg-rose-400/10 text-rose-300 text-sm px-3 py-2">
             <span>{error}</span>
             <button onClick={() => setError("")} className="text-rose-300 hover:text-rose-100"><X size={14} /></button>
+          </div>
+        </div>
+      )}
+
+      {notice && (
+        <div className="max-w-6xl mx-auto px-5 pt-3">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-[#B563FA]/40 bg-[#B563FA]/10 text-[#B563FA] text-sm px-3 py-2">
+            <span>{notice}</span>
+            <button onClick={() => setNotice("")} className="text-[#B563FA] hover:text-[#F3EEFB]"><X size={14} /></button>
           </div>
         </div>
       )}

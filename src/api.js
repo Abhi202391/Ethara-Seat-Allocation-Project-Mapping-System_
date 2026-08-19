@@ -65,13 +65,13 @@ export const api = {
     return { total: data.total, page: data.page, pageSize: data.page_size, items: data.items.map(normalizeEmployee) };
   },
 
-  createEmployee: async (payload) =>
-    normalizeEmployee(
-      await request("/employees", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })
-    ),
+  createEmployee: async (payload) => {
+    const data = await request("/employees", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return { employee: normalizeEmployee(data.employee), note: data.allocation_note };
+  },
 
   updateEmployee: async (id, payload) =>
     normalizeEmployee(

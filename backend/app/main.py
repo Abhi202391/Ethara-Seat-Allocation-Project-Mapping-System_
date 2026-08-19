@@ -34,9 +34,10 @@ def health():
 
 # ---------------- Employee APIs ----------------
 
-@app.post("/employees", response_model=schemas.EmployeeOut)
+@app.post("/employees", response_model=schemas.EmployeeCreateResponse)
 def create_employee(payload: schemas.EmployeeCreate, db: Session = Depends(get_db)):
-    return crud.create_employee(db, payload)
+    employee, allocation_note = crud.create_employee(db, payload)
+    return schemas.EmployeeCreateResponse(employee=schemas.EmployeeOut.model_validate(employee), allocation_note=allocation_note)
 
 
 @app.get("/employees", response_model=schemas.EmployeeListResponse)

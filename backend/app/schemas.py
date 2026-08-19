@@ -76,6 +76,11 @@ class EmployeeListResponse(BaseModel):
     items: List[EmployeeOut]
 
 
+class EmployeeCreateResponse(BaseModel):
+    employee: EmployeeOut
+    allocation_note: Optional[str] = None
+
+
 class SeatCreate(BaseModel):
     floor: int
     zone: str

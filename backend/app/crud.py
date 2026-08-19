@@ -59,14 +59,15 @@ def create_employee(db: Session, payload: schemas.EmployeeCreate) -> models.Empl
     db.commit()
     db.refresh(employee)
 
+    allocation_note = None
     if payload.auto_allocate:
         try:
-            allocate_seat(db, employee.id)
+            _, allocation_note = allocate_seat(db, employee.id)
             db.refresh(employee)
         except HTTPException:
-            pass  # no seat available right now — employee stays pending
+            allocation_note = "No seats were available at all — employee left pending. Allocate manually once a seat frees up."
 
-    return employee
+    return employee, allocation_note
 
 
 def update_employee(db: Session, employee_id: int, payload: schemas.EmployeeUpdate) -> models.Employee:
