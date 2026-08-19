@@ -350,6 +350,7 @@ def dashboard_project_utilization(db: Session):
         db.query(
             models.Project.id,
             models.Project.name,
+            models.Project.description,
             models.Project.manager_name,
             models.Project.status,
             func.count(func.distinct(models.Employee.id)).label("employee_count"),
@@ -368,6 +369,7 @@ def dashboard_project_utilization(db: Session):
         schemas.ProjectUtilizationOut(
             id=r.id,
             name=r.name,
+            description=r.description or "",
             manager_name=r.manager_name or "",
             status=r.status,
             employee_count=r.employee_count,

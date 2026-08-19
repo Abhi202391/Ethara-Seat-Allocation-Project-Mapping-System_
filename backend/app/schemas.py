@@ -124,6 +124,7 @@ class DashboardSummary(BaseModel):
 class ProjectUtilizationOut(BaseModel):
     id: int
     name: str
+    description: str
     manager_name: str
     status: str
     employee_count: int

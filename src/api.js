@@ -144,6 +144,7 @@ export const api = {
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
+      description: r.description,
       manager: r.manager_name,
       status: r.status,
       empCount: r.employee_count,
