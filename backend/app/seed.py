@@ -33,7 +33,20 @@ ROLES = [
     "Software Engineer", "Senior Engineer", "QA Analyst", "Product Manager", "UX Designer",
     "Data Analyst", "DevOps Engineer", "Support Specialist", "HR Executive", "Team Lead",
 ]
-PROJECT_NAMES = ["Indigo", "Indreed", "Mydreed", "Preed", "Serfy", "Oreed", "Bedegreed", "Opreed", "Serry", "Kaary", "Mered"]
+PROJECT_DESCRIPTIONS = {
+    "Indigo": "Enterprise resource planning suite for supply chain operations",
+    "Indreed": "Talent sourcing and recruitment analytics platform",
+    "Mydreed": "Employee self-service HR portal and benefits management",
+    "Preed": "Real-time payments and settlement infrastructure",
+    "Serfy": "Customer support ticketing and live-chat platform",
+    "Oreed": "Order management and fulfillment tracking system",
+    "Bedegreed": "Internal budgeting and financial forecasting tool",
+    "Opreed": "Operations dashboard for facilities and asset monitoring",
+    "Serry": "Sales CRM and pipeline forecasting application",
+    "Kaary": "Logistics and fleet route optimization engine",
+    "Mered": "Marketing campaign analytics and attribution platform",
+}
+PROJECT_NAMES = list(PROJECT_DESCRIPTIONS.keys())
 
 FLOORS = [1, 2, 3, 4, 5]
 ZONES = ["A", "B"]
@@ -59,7 +72,7 @@ def run(seed: int = 42):
         for name in PROJECT_NAMES:
             p = models.Project(
                 name=name,
-                description=f"{name} delivery workstream",
+                description=PROJECT_DESCRIPTIONS[name],
                 manager_name=f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}",
                 status="Active",
             )
