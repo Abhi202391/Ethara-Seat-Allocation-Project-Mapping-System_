@@ -147,6 +147,7 @@ export const api = {
       description: r.description,
       manager: r.manager_name,
       status: r.status,
+      createdAt: r.created_at,
       empCount: r.employee_count,
       seatCount: r.seat_count,
     }));

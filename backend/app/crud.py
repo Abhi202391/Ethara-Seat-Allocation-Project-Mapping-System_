@@ -353,6 +353,7 @@ def dashboard_project_utilization(db: Session):
             models.Project.description,
             models.Project.manager_name,
             models.Project.status,
+            models.Project.created_at,
             func.count(func.distinct(models.Employee.id)).label("employee_count"),
             func.count(func.distinct(models.Seat.id)).label("seat_count"),
         )
@@ -372,6 +373,7 @@ def dashboard_project_utilization(db: Session):
             description=r.description or "",
             manager_name=r.manager_name or "",
             status=r.status,
+            created_at=r.created_at,
             employee_count=r.employee_count,
             seat_count=r.seat_count,
         )

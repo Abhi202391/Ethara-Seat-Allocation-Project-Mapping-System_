@@ -634,7 +634,7 @@ export default function EtheraSeatDemo() {
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-emerald-400/30 text-emerald-300">{p.status}</span>
                 </div>
                 {p.description && <div className="text-xs text-[#D9CCEE] mb-2">{p.description}</div>}
-                <div className="text-xs text-[#A99BC4] mb-3">Manager: {p.manager}</div>
+                <div className="text-xs text-[#A99BC4] mb-3">Manager: {p.manager} · Created: {p.createdAt?.slice(0, 10)}</div>
                 <div className="flex gap-4 text-sm font-mono">
                   <div><span className="text-[#A99BC4] text-[11px] block">Employees</span>{p.empCount}</div>
                   <div><span className="text-[#A99BC4] text-[11px] block">Occupied Seats</span>{p.seatCount}</div>

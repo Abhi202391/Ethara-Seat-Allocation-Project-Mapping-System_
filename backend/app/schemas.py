@@ -127,6 +127,7 @@ class ProjectUtilizationOut(BaseModel):
     description: str
     manager_name: str
     status: str
+    created_at: datetime
     employee_count: int
     seat_count: int
 
