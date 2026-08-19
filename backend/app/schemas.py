@@ -30,6 +30,7 @@ class SeatOut(BaseModel):
     seat_number: str
     status: str
     employee_id: Optional[int] = None
+    employee_name: Optional[str] = None
     project_id: Optional[int] = None
     allocation_date: Optional[date] = None
 

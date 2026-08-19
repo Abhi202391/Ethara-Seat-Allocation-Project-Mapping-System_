@@ -32,6 +32,7 @@ export function normalizeSeat(s) {
     seatNumber: s.seat_number,
     status: s.status,
     employeeId: s.employee_id,
+    employeeName: s.employee_name,
     projectId: s.project_id,
     allocationDate: s.allocation_date,
   };

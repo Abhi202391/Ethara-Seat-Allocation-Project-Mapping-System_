@@ -543,10 +543,13 @@ export default function EtheraSeatDemo() {
                     [STATUS.RESERVED]: "bg-sky-400/15 border-sky-400/40 text-sky-300",
                     [STATUS.MAINTENANCE]: "bg-rose-400/15 border-rose-400/40 text-rose-300",
                   };
+                  const tooltip = s.employeeName
+                    ? `${s.status} · ${s.employeeName} · ${projectById[s.projectId]?.name || "—"} · allocated ${s.allocationDate}`
+                    : s.status;
                   return (
                     <div
                       key={s.id}
-                      title={s.status}
+                      title={tooltip}
                       className={`border rounded px-1.5 py-1.5 text-center font-mono text-[10px] leading-tight cursor-default ${colors[s.status]}`}
                     >
                       {s.seatNumber}

@@ -55,6 +55,10 @@ class Seat(Base):
 
     employee = relationship("Employee", back_populates="seat", foreign_keys=[employee_id])
 
+    @property
+    def employee_name(self):
+        return self.employee.name if self.employee else None
+
 
 class SeatAllocation(Base):
     __tablename__ = "seat_allocations"

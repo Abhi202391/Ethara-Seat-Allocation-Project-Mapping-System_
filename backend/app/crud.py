@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy import case, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from . import models, schemas
 
@@ -144,7 +144,7 @@ def list_employees(
 # ---------------- Seats ----------------
 
 def list_seats(db: Session, floor: Optional[int], zone: Optional[str], status_filter: Optional[str]):
-    query = db.query(models.Seat)
+    query = db.query(models.Seat).options(joinedload(models.Seat.employee))
     if floor:
         query = query.filter(models.Seat.floor == floor)
     if zone:
