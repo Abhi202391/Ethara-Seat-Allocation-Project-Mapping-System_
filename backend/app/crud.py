@@ -318,6 +318,56 @@ def release_seat(db: Session, employee_id: int):
     return seat
 
 
+def list_seat_allocations(
+    db: Session,
+    employee_id: Optional[int] = None,
+    seat_id: Optional[int] = None,
+    project_id: Optional[int] = None,
+    status_filter: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+):
+    query = (
+        db.query(models.SeatAllocation)
+        .join(models.Employee, models.SeatAllocation.employee_id == models.Employee.id)
+        .join(models.Seat, models.SeatAllocation.seat_id == models.Seat.id)
+        .outerjoin(models.Project, models.SeatAllocation.project_id == models.Project.id)
+        .options(
+            joinedload(models.SeatAllocation.employee),
+            joinedload(models.SeatAllocation.seat),
+            joinedload(models.SeatAllocation.project),
+        )
+    )
+    if employee_id:
+        query = query.filter(models.SeatAllocation.employee_id == employee_id)
+    if seat_id:
+        query = query.filter(models.SeatAllocation.seat_id == seat_id)
+    if project_id:
+        query = query.filter(models.SeatAllocation.project_id == project_id)
+    if status_filter in ("active", "released"):
+        query = query.filter(models.SeatAllocation.allocation_status == status_filter)
+    if search:
+        like = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(models.Employee.name).like(like),
+                func.lower(models.Employee.employee_code).like(like),
+                func.lower(models.Seat.seat_number).like(like),
+                func.lower(models.Project.name).like(like),
+            )
+        )
+
+    total = query.count()
+    items = (
+        query.order_by(models.SeatAllocation.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return total, items
+
+
 # ---------------- Dashboard ----------------
 
 def dashboard_summary(db: Session) -> schemas.DashboardSummary:

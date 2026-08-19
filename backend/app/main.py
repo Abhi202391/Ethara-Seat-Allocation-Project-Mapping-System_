@@ -171,6 +171,38 @@ def release_seat(payload: schemas.ReleaseRequest, db: Session = Depends(get_db))
     return crud.release_seat(db, payload.employee_id)
 
 
+# ---------------- Seat Allocation history (audit trail) ----------------
+
+@app.get("/seat-allocations", response_model=schemas.SeatAllocationListResponse)
+def list_seat_allocations(
+    employee_id: Optional[int] = None,
+    seat_id: Optional[int] = None,
+    project_id: Optional[int] = None,
+    status: Optional[str] = Query(None, description="active | released"),
+    search: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    total, rows = crud.list_seat_allocations(db, employee_id, seat_id, project_id, status, search, page, page_size)
+    items = [
+        schemas.SeatAllocationOut(
+            id=r.id,
+            employee_id=r.employee_id,
+            employee_name=r.employee.name,
+            seat_id=r.seat_id,
+            seat_number=r.seat.seat_number,
+            project_id=r.project_id,
+            project_name=r.project.name if r.project else None,
+            allocation_status=r.allocation_status,
+            allocation_date=r.allocation_date,
+            released_date=r.released_date,
+        )
+        for r in rows
+    ]
+    return schemas.SeatAllocationListResponse(total=total, page=page, page_size=page_size, items=items)
+
+
 # ---------------- Dashboard APIs ----------------
 
 @app.get("/dashboard/summary", response_model=schemas.DashboardSummary)

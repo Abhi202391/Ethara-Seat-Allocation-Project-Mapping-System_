@@ -111,6 +111,26 @@ class ReleaseRequest(BaseModel):
     employee_id: int
 
 
+class SeatAllocationOut(BaseModel):
+    id: int
+    employee_id: int
+    employee_name: str
+    seat_id: int
+    seat_number: str
+    project_id: Optional[int] = None
+    project_name: Optional[str] = None
+    allocation_status: str
+    allocation_date: date
+    released_date: Optional[date] = None
+
+
+class SeatAllocationListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: List[SeatAllocationOut]
+
+
 class DashboardSummary(BaseModel):
     total_employees: int
     total_seats: int

@@ -70,3 +70,7 @@ class SeatAllocation(Base):
     allocation_status = Column(String, default="active")  # active / released
     allocation_date = Column(Date, nullable=False)
     released_date = Column(Date, nullable=True)
+
+    employee = relationship("Employee", foreign_keys=[employee_id])
+    seat = relationship("Seat", foreign_keys=[seat_id])
+    project = relationship("Project", foreign_keys=[project_id])

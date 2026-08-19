@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search, MapPin, Users, Briefcase, MessageSquare,
   CheckCircle2, Clock, AlertTriangle, LayoutGrid,
-  UserPlus, X, Send, Plus, Upload, Loader2, Pencil, Ban, ListChecks
+  UserPlus, X, Send, Plus, Upload, Loader2, Pencil, Ban, ListChecks, History
 } from "lucide-react";
 import { api } from "./api";
 
@@ -69,6 +69,14 @@ export default function EtheraSeatDemo() {
   const [seats, setSeats] = useState([]);
   const [seatsLoading, setSeatsLoading] = useState(true);
 
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("All");
+  const [historyPage, setHistoryPage] = useState(0);
+  const HISTORY_PAGE_SIZE = 15;
+  const [history, setHistory] = useState([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
   const [aiInput, setAiInput] = useState("");
   const [aiLog, setAiLog] = useState([
     { role: "system", text: "Ask me things like “where is Amit seated”, “available seats on floor 3”, or “how many seats occupied for project Indigo”." },
@@ -101,6 +109,7 @@ export default function EtheraSeatDemo() {
 
   const projectById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
   const totalPages = Math.max(1, Math.ceil(employeeTotal / PAGE_SIZE));
+  const historyTotalPages = Math.max(1, Math.ceil(historyTotal / HISTORY_PAGE_SIZE));
 
   async function loadProjects() {
     try {
@@ -152,6 +161,21 @@ export default function EtheraSeatDemo() {
     }
   }
 
+  async function loadHistory() {
+    setHistoryLoading(true);
+    try {
+      const res = await api.listSeatAllocations({
+        search: historyQuery, status: historyStatusFilter, page: historyPage + 1, pageSize: HISTORY_PAGE_SIZE,
+      });
+      setHistory(res.items);
+      setHistoryTotal(res.total);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadProjects();
     loadDashboard();
@@ -167,6 +191,12 @@ export default function EtheraSeatDemo() {
     loadSeats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seatFloorFilter, seatZoneFilter, seatStatusFilter]);
+
+  useEffect(() => {
+    const t = setTimeout(loadHistory, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyQuery, historyStatusFilter, historyPage]);
 
   async function allocateSeat(employeeId, seatId = null) {
     const { note } = await api.allocateSeat(employeeId, seatId);
@@ -347,6 +377,7 @@ export default function EtheraSeatDemo() {
     { id: "employees", label: "Employees", icon: Users },
     { id: "seats", label: "Seat Map", icon: MapPin },
     { id: "projects", label: "Projects", icon: Briefcase },
+    { id: "history", label: "History", icon: History },
     { id: "ai", label: "AI Assistant", icon: MessageSquare },
   ];
 
@@ -642,6 +673,77 @@ export default function EtheraSeatDemo() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {tab === "history" && (
+          <div className="space-y-4">
+            <div className="text-[11px] font-mono text-[#7A6B96]">
+              Full seat_allocations audit trail — every allocation and release, active or historical.
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex-1 flex items-center gap-2 bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2">
+                {historyLoading ? <Loader2 size={15} className="text-[#A99BC4] animate-spin" /> : <Search size={15} className="text-[#A99BC4]" />}
+                <input
+                  value={historyQuery}
+                  onChange={(e) => { setHistoryQuery(e.target.value); setHistoryPage(0); }}
+                  placeholder="Search by employee, seat number, or project…"
+                  className="bg-transparent outline-none text-sm w-full placeholder:text-[#7A6B96]"
+                />
+              </div>
+              <select
+                value={historyStatusFilter}
+                onChange={(e) => { setHistoryStatusFilter(e.target.value); setHistoryPage(0); }}
+                className="bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm"
+              >
+                <option>All</option>
+                <option>Active</option>
+                <option>Released</option>
+              </select>
+            </div>
+
+            <div className="rounded-lg border border-[#2E1F47] overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-[#000000] text-[#A99BC4] text-[11px] uppercase tracking-wide font-mono">
+                  <tr>
+                    <th className="text-left px-3 py-2">Employee</th>
+                    <th className="text-left px-3 py-2 hidden sm:table-cell">Seat</th>
+                    <th className="text-left px-3 py-2 hidden md:table-cell">Project</th>
+                    <th className="text-left px-3 py-2">Status</th>
+                    <th className="text-left px-3 py-2 hidden sm:table-cell">Allocated</th>
+                    <th className="text-left px-3 py-2 hidden sm:table-cell">Released</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((h) => (
+                    <tr key={h.id} className="border-t border-[#241934] hover:bg-[#000000]/60">
+                      <td className="px-3 py-2">{h.employeeName}</td>
+                      <td className="px-3 py-2 hidden sm:table-cell font-mono text-[#D9CCEE]">{h.seatNumber}</td>
+                      <td className="px-3 py-2 hidden md:table-cell text-[#D9CCEE]">{h.projectName || "—"}</td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-mono uppercase tracking-wide ${
+                          h.status === "active" ? "bg-emerald-400/15 text-emerald-300 border-emerald-400/30" : "bg-[#241934] text-[#A99BC4] border-[#2E1F47]"
+                        }`}>{h.status}</span>
+                      </td>
+                      <td className="px-3 py-2 hidden sm:table-cell font-mono text-[#D9CCEE]">{h.allocationDate}</td>
+                      <td className="px-3 py-2 hidden sm:table-cell font-mono text-[#D9CCEE]">{h.releasedDate || "—"}</td>
+                    </tr>
+                  ))}
+                  {!history.length && !historyLoading && (
+                    <tr><td colSpan={6} className="px-3 py-8 text-center text-[#A99BC4] text-sm">No allocation history matches this search.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-[#A99BC4] font-mono">
+              <span>{historyTotal} record{historyTotal === 1 ? "" : "s"}</span>
+              <div className="flex items-center gap-2">
+                <button disabled={historyPage === 0} onClick={() => setHistoryPage((p) => p - 1)} className="px-2 py-1 border border-[#2E1F47] rounded disabled:opacity-30">Prev</button>
+                <span>Page {historyPage + 1} / {historyTotalPages}</span>
+                <button disabled={historyPage >= historyTotalPages - 1} onClick={() => setHistoryPage((p) => p + 1)} className="px-2 py-1 border border-[#2E1F47] rounded disabled:opacity-30">Next</button>
+              </div>
+            </div>
           </div>
         )}
 

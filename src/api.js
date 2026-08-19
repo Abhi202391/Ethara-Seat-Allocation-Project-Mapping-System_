@@ -126,6 +126,27 @@ export const api = {
       })
     ),
 
+  listSeatAllocations: async ({ search = "", status = "All", page = 1, pageSize = 15 } = {}) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    if (search) params.set("search", search);
+    if (status === "Active") params.set("status", "active");
+    if (status === "Released") params.set("status", "released");
+    const data = await request(`/seat-allocations?${params.toString()}`);
+    const items = data.items.map((r) => ({
+      id: r.id,
+      employeeId: r.employee_id,
+      employeeName: r.employee_name,
+      seatId: r.seat_id,
+      seatNumber: r.seat_number,
+      projectId: r.project_id,
+      projectName: r.project_name,
+      status: r.allocation_status,
+      allocationDate: r.allocation_date,
+      releasedDate: r.released_date,
+    }));
+    return { total: data.total, page: data.page, pageSize: data.page_size, items };
+  },
+
   dashboardSummary: async () => {
     const d = await request("/dashboard/summary");
     return {
