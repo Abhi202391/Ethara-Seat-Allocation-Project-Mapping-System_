@@ -70,7 +70,7 @@ def answer_query(db: Session, raw_query: str) -> str:
         plural = "" if total == 1 else "s"
         return f"Floor {floor} has {total} available seat{plural}, including: {sample}{suffix}."
 
-    if any(w in q for w in ("occupied", "how many", "utilization", "seats for")):
+    if "project" in q and any(w in q for w in ("occupied", "how many", "utilization", "seats for")):
         projects = db.query(models.Project).all()
         proj = next((p for p in projects if p.name.lower() in q), None)
         if proj:
@@ -86,6 +86,12 @@ def answer_query(db: Session, raw_query: str) -> str:
                 f"Project {proj.name} has {occ} occupied seat{occ_plural} across "
                 f"{emp_count} assigned employee{emp_plural}."
             )
+        token = _extract_name_token(raw_query)
+        available_names = ", ".join(p.name for p in projects)
+        return (
+            f"I couldn't find a project called {token or 'that'}. "
+            f"Available projects: {available_names}."
+        )
 
     if any(p in q for p in ("who is sitting near", "near me", "neighbours", "neighbors")):
         token = _extract_name_token(raw_query)
