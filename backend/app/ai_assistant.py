@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from . import models
 
 STOPWORDS = {
-    "where", "is", "seated", "seat", "who", "sitting", "near", "me", "which",
+    "where", "is", "are", "seated", "seat", "who", "sitting", "near", "me", "which",
     "project", "assigned", "to", "for", "how", "many", "seats", "occupied",
     "available", "on", "floor", "the", "a", "an", "of", "allocate", "new",
     "employee", "joining", "today", "show", "all", "what", "am", "i",
