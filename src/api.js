@@ -101,12 +101,21 @@ export const api = {
     return data.map(normalizeSeat);
   },
 
-  allocateSeat: async (employeeId) => {
+  allocateSeat: async (employeeId, seatId = null) => {
     const data = await request("/seats/allocate", {
       method: "POST",
-      body: JSON.stringify({ employee_id: employeeId }),
+      body: JSON.stringify({ employee_id: employeeId, seat_id: seatId }),
     });
     return { seat: normalizeSeat(data.seat), note: data.note };
+  },
+
+  suggestSeats: async ({ projectId, preferredFloor, preferredZone, limit = 8 } = {}) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (projectId) params.set("project_id", String(projectId));
+    if (preferredFloor) params.set("preferred_floor", String(preferredFloor));
+    if (preferredZone) params.set("preferred_zone", preferredZone);
+    const data = await request(`/seats/suggestions?${params.toString()}`);
+    return data.map((s) => ({ seat: normalizeSeat(s.seat), reason: s.reason }));
   },
 
   releaseSeat: async (employeeId) =>

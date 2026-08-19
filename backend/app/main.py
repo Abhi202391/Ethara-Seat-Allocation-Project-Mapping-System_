@@ -146,9 +146,23 @@ def list_available_seats(floor: Optional[int] = None, zone: Optional[str] = None
     return crud.list_available_seats(db, floor, zone)
 
 
+@app.get("/seats/suggestions", response_model=List[schemas.SeatSuggestion])
+def suggest_seats(
+    project_id: Optional[int] = None,
+    preferred_floor: Optional[int] = None,
+    preferred_zone: Optional[str] = None,
+    limit: int = Query(8, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    ranked = crud.suggest_seats(db, project_id, preferred_floor, preferred_zone, limit)
+    return [schemas.SeatSuggestion(seat=schemas.SeatOut.model_validate(seat), reason=reason) for seat, reason in ranked]
+
+
 @app.post("/seats/allocate", response_model=schemas.AllocateResponse)
 def allocate_seat(payload: schemas.AllocateRequest, db: Session = Depends(get_db)):
-    seat, note = crud.allocate_seat(db, payload.employee_id, payload.preferred_floor, payload.preferred_zone)
+    seat, note = crud.allocate_seat(
+        db, payload.employee_id, payload.preferred_floor, payload.preferred_zone, seat_id=payload.seat_id
+    )
     return schemas.AllocateResponse(seat=schemas.SeatOut.model_validate(seat), note=note)
 
 

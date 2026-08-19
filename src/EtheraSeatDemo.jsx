@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search, MapPin, Users, Briefcase, MessageSquare,
   CheckCircle2, Clock, AlertTriangle, LayoutGrid,
-  UserPlus, X, Send, Plus, Upload, Loader2, Pencil, Ban
+  UserPlus, X, Send, Plus, Upload, Loader2, Pencil, Ban, ListChecks
 } from "lucide-react";
 import { api } from "./api";
 
@@ -79,9 +79,16 @@ export default function EtheraSeatDemo() {
   const [addForm, setAddForm] = useState({
     name: "", email: "", department: DEPARTMENTS[0], role: ROLES[0],
     joiningDate: new Date().toISOString().slice(0, 10), projectId: "", autoAllocate: true,
+    seatId: null, seatLabel: "",
   });
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [addError, setAddError] = useState("");
+
+  const [seatPicker, setSeatPicker] = useState(null); // { mode: 'allocate' | 'create', employeeId, employeeName, projectId }
+  const [pickerSuggestions, setPickerSuggestions] = useState([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerError, setPickerError] = useState("");
+  const [pickerBusy, setPickerBusy] = useState(false);
 
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editForm, setEditForm] = useState(null);
@@ -161,14 +168,48 @@ export default function EtheraSeatDemo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seatFloorFilter, seatZoneFilter, seatStatusFilter]);
 
-  async function allocateSeat(employeeId) {
+  async function allocateSeat(employeeId, seatId = null) {
+    const { note } = await api.allocateSeat(employeeId, seatId);
+    const empName = employees.find((e) => e.id === employeeId)?.name || "Employee";
+    setNotice(note ? `${empName}: ${note}` : "");
+    await Promise.all([loadEmployees(), loadDashboard()]);
+  }
+
+  async function openSeatPicker(opts) {
+    setSeatPicker(opts);
+    setPickerError("");
+    setPickerLoading(true);
     try {
-      const { note } = await api.allocateSeat(employeeId);
-      const empName = employees.find((e) => e.id === employeeId)?.name || "Employee";
-      setNotice(note ? `${empName}: ${note}` : "");
-      await Promise.all([loadEmployees(), loadDashboard()]);
+      setPickerSuggestions(await api.suggestSeats({ projectId: opts.projectId, limit: 8 }));
     } catch (e) {
-      setError(e.message);
+      setPickerError(e.message);
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
+  function closeSeatPicker() {
+    setSeatPicker(null);
+    setPickerSuggestions([]);
+    setPickerError("");
+  }
+
+  async function handlePickSeat(suggestion) {
+    if (!seatPicker) return;
+    const seat = suggestion.seat;
+    if (seatPicker.mode === "create") {
+      setAddForm((f) => ({ ...f, seatId: seat.id, seatLabel: `${seat.seatNumber} · Floor ${seat.floor} Zone ${seat.zone} (${suggestion.reason})` }));
+      closeSeatPicker();
+      return;
+    }
+    setPickerBusy(true);
+    try {
+      await allocateSeat(seatPicker.employeeId, seat.id);
+      closeSeatPicker();
+    } catch (e) {
+      setPickerError(e.message);
+    } finally {
+      setPickerBusy(false);
     }
   }
 
@@ -202,6 +243,7 @@ export default function EtheraSeatDemo() {
     setAddForm({
       name: "", email: "", department: DEPARTMENTS[0], role: ROLES[0],
       joiningDate: new Date().toISOString().slice(0, 10), projectId: projects[0]?.id ?? "", autoAllocate: true,
+      seatId: null, seatLabel: "",
     });
     setAddError("");
     setShowAddModal(true);
@@ -220,6 +262,7 @@ export default function EtheraSeatDemo() {
         joining_date: addForm.joiningDate,
         project_id: addForm.projectId ? Number(addForm.projectId) : null,
         auto_allocate: addForm.autoAllocate,
+        seat_id: addForm.seatId,
       });
       setNotice(note ? `${employee.name}: ${note}` : "");
       setShowAddModal(false);
@@ -487,7 +530,7 @@ export default function EtheraSeatDemo() {
                                 <X size={12} /> Release
                               </button>
                             ) : (
-                              <button onClick={() => allocateSeat(e.id)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-emerald-400/50 hover:text-emerald-300 inline-flex items-center gap-1">
+                              <button onClick={() => openSeatPicker({ mode: "allocate", employeeId: e.id, employeeName: e.name, projectId: e.projectId })} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-emerald-400/50 hover:text-emerald-300 inline-flex items-center gap-1">
                                 <UserPlus size={12} /> Allocate
                               </button>
                             )}
@@ -692,9 +735,24 @@ export default function EtheraSeatDemo() {
                 </div>
               </div>
               <label className="flex items-center gap-2 text-xs text-[#A99BC4] font-mono">
-                <input type="checkbox" checked={addForm.autoAllocate} onChange={(e) => setAddForm((f) => ({ ...f, autoAllocate: e.target.checked }))} />
-                Auto-allocate a seat on creation
+                <input type="checkbox" checked={addForm.autoAllocate} onChange={(e) => setAddForm((f) => ({ ...f, autoAllocate: e.target.checked, seatId: e.target.checked ? f.seatId : null, seatLabel: e.target.checked ? f.seatLabel : "" }))} />
+                Allocate a seat on creation
               </label>
+              {addForm.autoAllocate && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-[#2E1F47] px-3 py-2 text-xs font-mono">
+                  <span className="text-[#D9CCEE]">{addForm.seatLabel || "Best available seat will be picked automatically"}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button type="button" onClick={() => openSeatPicker({ mode: "create", projectId: addForm.projectId ? Number(addForm.projectId) : null })} className="px-2 py-1 rounded border border-[#B563FA]/40 text-[#B563FA] hover:bg-[#B563FA]/10 inline-flex items-center gap-1">
+                      <ListChecks size={12} /> Choose seat
+                    </button>
+                    {addForm.seatId && (
+                      <button type="button" onClick={() => setAddForm((f) => ({ ...f, seatId: null, seatLabel: "" }))} className="px-2 py-1 rounded border border-[#2E1F47] text-[#A99BC4] hover:text-[#F3EEFB]">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               {addError && <div className="text-xs text-rose-300 border border-rose-400/30 bg-rose-400/10 rounded px-2 py-1.5">{addError}</div>}
               <div className="flex justify-end gap-2 pt-1">
                 <button type="button" onClick={() => setShowAddModal(false)} className="text-sm px-3 py-1.5 rounded-lg border border-[#2E1F47] text-[#A99BC4] hover:text-[#F3EEFB]">Cancel</button>
@@ -775,6 +833,56 @@ export default function EtheraSeatDemo() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {seatPicker && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+          <div className="w-full max-w-lg rounded-lg border border-[#2E1F47] bg-[#0A0710] p-5 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-sm font-semibold text-[#B563FA] flex items-center gap-1.5"><ListChecks size={15} /> Choose a Seat</div>
+              <button onClick={closeSeatPicker} className="text-[#A99BC4] hover:text-[#F3EEFB]"><X size={16} /></button>
+            </div>
+            <div className="text-[11px] font-mono text-[#A99BC4] mb-3">
+              {seatPicker.mode === "allocate" ? `for ${seatPicker.employeeName}` : "for this new joiner"} · suggestions ranked by project-team proximity
+            </div>
+
+            {pickerLoading && (
+              <div className="flex items-center gap-2 text-sm text-[#A99BC4] py-8 justify-center"><Loader2 size={16} className="animate-spin" /> Finding suggestions…</div>
+            )}
+
+            {pickerError && (
+              <div className="text-xs text-rose-300 border border-rose-400/30 bg-rose-400/10 rounded px-2 py-1.5 mb-2">{pickerError}</div>
+            )}
+
+            {!pickerLoading && !pickerSuggestions.length && !pickerError && (
+              <div className="text-sm text-[#A99BC4] py-8 text-center">No available seats found right now.</div>
+            )}
+
+            <div className="space-y-1.5 overflow-y-auto">
+              {pickerSuggestions.map((s) => {
+                const reasonStyle = s.reason === "near your project team"
+                  ? "border-emerald-400/30 text-emerald-300 bg-emerald-400/10"
+                  : s.reason === "matches your preferred floor/zone"
+                  ? "border-sky-400/30 text-sky-300 bg-sky-400/10"
+                  : "border-[#2E1F47] text-[#A99BC4] bg-transparent";
+                return (
+                  <button
+                    key={s.seat.id}
+                    disabled={pickerBusy}
+                    onClick={() => handlePickSeat(s)}
+                    className="w-full flex items-center justify-between gap-3 rounded-lg border border-[#2E1F47] hover:border-[#B563FA]/50 px-3 py-2 text-left disabled:opacity-50"
+                  >
+                    <div>
+                      <div className="text-sm font-mono text-[#F3EEFB]">{s.seat.seatNumber} <span className="text-[#A99BC4]">· Floor {s.seat.floor}, Zone {s.seat.zone}, Bay {s.seat.bay}</span></div>
+                      <span className={`inline-block mt-1 text-[10px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded border ${reasonStyle}`}>{s.reason}</span>
+                    </div>
+                    {pickerBusy ? <Loader2 size={14} className="animate-spin text-[#B563FA]" /> : <span className="text-[11px] font-mono text-[#B563FA]">Select →</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

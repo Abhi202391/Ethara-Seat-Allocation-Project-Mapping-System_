@@ -48,6 +48,7 @@ class EmployeeBase(BaseModel):
 class EmployeeCreate(EmployeeBase):
     employee_code: Optional[str] = None
     auto_allocate: Optional[bool] = True
+    seat_id: Optional[int] = None
 
 
 class EmployeeUpdate(BaseModel):
@@ -91,6 +92,7 @@ class SeatCreate(BaseModel):
 
 class AllocateRequest(BaseModel):
     employee_id: int
+    seat_id: Optional[int] = None
     preferred_floor: Optional[int] = None
     preferred_zone: Optional[str] = None
 
@@ -98,6 +100,11 @@ class AllocateRequest(BaseModel):
 class AllocateResponse(BaseModel):
     seat: SeatOut
     note: Optional[str] = None
+
+
+class SeatSuggestion(BaseModel):
+    seat: SeatOut
+    reason: str
 
 
 class ReleaseRequest(BaseModel):

@@ -60,9 +60,9 @@ def create_employee(db: Session, payload: schemas.EmployeeCreate) -> models.Empl
     db.refresh(employee)
 
     allocation_note = None
-    if payload.auto_allocate:
+    if payload.seat_id is not None or payload.auto_allocate:
         try:
-            _, allocation_note = allocate_seat(db, employee.id)
+            _, allocation_note = allocate_seat(db, employee.id, seat_id=payload.seat_id)
             db.refresh(employee)
         except HTTPException:
             allocation_note = "No seats were available at all — employee left pending. Allocate manually once a seat frees up."
@@ -169,12 +169,22 @@ def allocate_seat(
     employee_id: int,
     preferred_floor: Optional[int] = None,
     preferred_zone: Optional[str] = None,
+    seat_id: Optional[int] = None,
 ):
     employee = db.get(models.Employee, employee_id)
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
     if employee.seat:
         raise HTTPException(status_code=400, detail="Employee already has an active seat")
+
+    if seat_id is not None:
+        # caller picked a specific seat from the suggestions list -- honor it directly
+        chosen = db.get(models.Seat, seat_id)
+        if not chosen:
+            raise HTTPException(status_code=404, detail="Seat not found")
+        if chosen.status != "Available":
+            raise HTTPException(status_code=409, detail="That seat is no longer available — pick another suggestion.")
+        return _commit_allocation(db, employee, chosen), None
 
     note = None
     candidates = []
@@ -205,7 +215,10 @@ def allocate_seat(
         if note is None and (employee.project_id or preferred_floor or preferred_zone):
             note = "No seats available near your team; allocated from an alternate zone."
 
-    seat = candidates[0]
+    return _commit_allocation(db, employee, candidates[0]), note
+
+
+def _commit_allocation(db: Session, employee: models.Employee, seat: models.Seat) -> models.Seat:
     today = date.today()
     seat.status = "Occupied"
     seat.employee_id = employee.id
@@ -221,7 +234,47 @@ def allocate_seat(
     ))
     db.commit()
     db.refresh(seat)
-    return seat, note
+    return seat
+
+
+def suggest_seats(
+    db: Session,
+    project_id: Optional[int] = None,
+    preferred_floor: Optional[int] = None,
+    preferred_zone: Optional[str] = None,
+    limit: int = 8,
+):
+    """Ranked list of candidate seats for an interactive picker, without allocating any of them."""
+    suggestions = []
+    seen_ids = set()
+
+    def add(seats, reason):
+        for s in seats:
+            if len(suggestions) >= limit:
+                break
+            if s.id in seen_ids:
+                continue
+            suggestions.append((s, reason))
+            seen_ids.add(s.id)
+
+    if project_id:
+        teammate_floor = (
+            db.query(models.Seat.floor)
+            .filter(models.Seat.project_id == project_id, models.Seat.status == "Occupied")
+            .group_by(models.Seat.floor)
+            .order_by(func.count(models.Seat.id).desc())
+            .first()
+        )
+        if teammate_floor:
+            add(list_available_seats(db, floor=teammate_floor[0]), "near your project team")
+
+    if len(suggestions) < limit and (preferred_floor or preferred_zone):
+        add(list_available_seats(db, floor=preferred_floor, zone=preferred_zone), "matches your preferred floor/zone")
+
+    if len(suggestions) < limit:
+        add(list_available_seats(db), "next available seat")
+
+    return suggestions
 
 
 def release_seat(db: Session, employee_id: int):
