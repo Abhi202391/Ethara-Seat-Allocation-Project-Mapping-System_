@@ -54,6 +54,7 @@ class EmployeeUpdate(BaseModel):
     email: Optional[str] = None
     department: Optional[str] = None
     role: Optional[str] = None
+    joining_date: Optional[date] = None
     status: Optional[str] = None
     project_id: Optional[int] = None
 

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search, MapPin, Users, Briefcase, MessageSquare,
   CheckCircle2, Clock, AlertTriangle, LayoutGrid,
-  UserPlus, X, Send, Plus, Upload, Loader2
+  UserPlus, X, Send, Plus, Upload, Loader2, Pencil, Ban
 } from "lucide-react";
 import { api } from "./api";
 
@@ -23,6 +23,7 @@ function StatusBadge({ status }) {
     [STATUS.RESERVED]: "bg-sky-400/15 text-sky-300 border-sky-400/30",
     [STATUS.MAINTENANCE]: "bg-rose-400/15 text-rose-300 border-rose-400/30",
     Pending: "bg-fuchsia-400/15 text-fuchsia-300 border-fuchsia-400/30",
+    Inactive: "bg-rose-400/15 text-rose-300 border-rose-400/30",
   };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-mono uppercase tracking-wide ${map[status] || ""}`}>
@@ -80,6 +81,11 @@ export default function EtheraSeatDemo() {
   });
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [addError, setAddError] = useState("");
+
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState("");
 
   const fileInputRef = useRef(null);
   const [csvMessage, setCsvMessage] = useState("");
@@ -219,6 +225,54 @@ export default function EtheraSeatDemo() {
       setAddError(err.message);
     } finally {
       setAddSubmitting(false);
+    }
+  }
+
+  function openEditModal(emp) {
+    setEditingEmployee(emp);
+    setEditForm({
+      name: emp.name,
+      email: emp.email,
+      department: emp.department || DEPARTMENTS[0],
+      role: emp.role || ROLES[0],
+      joiningDate: emp.joiningDate,
+      status: emp.status,
+      projectId: emp.projectId ?? "",
+    });
+    setEditError("");
+  }
+
+  async function submitEditEmployee(e) {
+    e.preventDefault();
+    if (!editingEmployee) return;
+    setEditSubmitting(true);
+    setEditError("");
+    try {
+      await api.updateEmployee(editingEmployee.id, {
+        name: editForm.name,
+        email: editForm.email,
+        department: editForm.department,
+        role: editForm.role,
+        joining_date: editForm.joiningDate,
+        status: editForm.status,
+        project_id: editForm.projectId ? Number(editForm.projectId) : null,
+      });
+      setEditingEmployee(null);
+      await Promise.all([loadEmployees(), loadDashboard()]);
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
+
+  async function deactivateEmployee(emp) {
+    if (!window.confirm(`Deactivate ${emp.name}? This releases their seat if they have one.`)) return;
+    try {
+      await api.deactivateEmployee(emp.id);
+      await Promise.all([loadEmployees(), loadDashboard()]);
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -386,6 +440,7 @@ export default function EtheraSeatDemo() {
                 <thead className="bg-[#000000] text-[#A99BC4] text-[11px] uppercase tracking-wide font-mono">
                   <tr>
                     <th className="text-left px-3 py-2">Employee</th>
+                    <th className="text-left px-3 py-2 hidden lg:table-cell">Department / Role</th>
                     <th className="text-left px-3 py-2 hidden md:table-cell">Project</th>
                     <th className="text-left px-3 py-2 hidden sm:table-cell">Seat</th>
                     <th className="text-left px-3 py-2">Status</th>
@@ -398,8 +453,14 @@ export default function EtheraSeatDemo() {
                     return (
                       <tr key={e.id} className="border-t border-[#241934] hover:bg-[#000000]/60">
                         <td className="px-3 py-2">
-                          <div className="font-medium">{e.name}</div>
+                          <div className="font-medium flex items-center gap-1.5">
+                            {e.name}
+                            {e.status !== "Active" && <StatusBadge status="Inactive" />}
+                          </div>
                           <div className="text-[11px] text-[#A99BC4] font-mono">{e.code} · {e.email}</div>
+                        </td>
+                        <td className="px-3 py-2 hidden lg:table-cell text-[#D9CCEE] text-xs">
+                          {e.department}<div className="text-[11px] text-[#A99BC4]">{e.role} · joined {e.joiningDate}</div>
                         </td>
                         <td className="px-3 py-2 hidden md:table-cell text-[#D9CCEE]">{projectById[e.projectId]?.name}</td>
                         <td className="px-3 py-2 hidden sm:table-cell font-mono text-[#D9CCEE]">
@@ -407,21 +468,29 @@ export default function EtheraSeatDemo() {
                         </td>
                         <td className="px-3 py-2"><StatusBadge status={seat ? "Occupied" : "Pending"} /></td>
                         <td className="px-3 py-2 text-right">
-                          {seat ? (
-                            <button onClick={() => releaseSeat(e.id)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-rose-400/50 hover:text-rose-300 inline-flex items-center gap-1">
-                              <X size={12} /> Release
+                          <div className="flex justify-end flex-wrap gap-1">
+                            {seat ? (
+                              <button onClick={() => releaseSeat(e.id)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-rose-400/50 hover:text-rose-300 inline-flex items-center gap-1">
+                                <X size={12} /> Release
+                              </button>
+                            ) : (
+                              <button onClick={() => allocateSeat(e.id)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-emerald-400/50 hover:text-emerald-300 inline-flex items-center gap-1">
+                                <UserPlus size={12} /> Allocate
+                              </button>
+                            )}
+                            <button onClick={() => openEditModal(e)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-[#B563FA]/50 hover:text-[#B563FA] inline-flex items-center gap-1">
+                              <Pencil size={12} /> Edit
                             </button>
-                          ) : (
-                            <button onClick={() => allocateSeat(e.id)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-emerald-400/50 hover:text-emerald-300 inline-flex items-center gap-1">
-                              <UserPlus size={12} /> Allocate
+                            <button onClick={() => deactivateEmployee(e)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-rose-400/50 hover:text-rose-300 inline-flex items-center gap-1">
+                              <Ban size={12} /> Deactivate
                             </button>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     );
                   })}
                   {!employees.length && !employeesLoading && (
-                    <tr><td colSpan={5} className="px-3 py-8 text-center text-[#A99BC4] text-sm">No employees match this search.</td></tr>
+                    <tr><td colSpan={6} className="px-3 py-8 text-center text-[#A99BC4] text-sm">No employees match this search.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -615,6 +684,78 @@ export default function EtheraSeatDemo() {
                 <button type="button" onClick={() => setShowAddModal(false)} className="text-sm px-3 py-1.5 rounded-lg border border-[#2E1F47] text-[#A99BC4] hover:text-[#F3EEFB]">Cancel</button>
                 <button type="submit" disabled={addSubmitting} className="text-sm px-3 py-1.5 rounded-lg bg-[#B563FA]/15 border border-[#B563FA]/40 text-[#B563FA] hover:bg-[#B563FA]/25 inline-flex items-center gap-1.5 disabled:opacity-50">
                   {addSubmitting && <Loader2 size={13} className="animate-spin" />} Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingEmployee && editForm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+          <div className="w-full max-w-md rounded-lg border border-[#2E1F47] bg-[#0A0710] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-sm font-semibold text-[#B563FA]">Edit Employee</div>
+                <div className="text-[11px] font-mono text-[#A99BC4]">{editingEmployee.code}</div>
+              </div>
+              <button onClick={() => setEditingEmployee(null)} className="text-[#A99BC4] hover:text-[#F3EEFB]"><X size={16} /></button>
+            </div>
+            <form onSubmit={submitEditEmployee} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-mono uppercase tracking-wide text-[#A99BC4]">Name</label>
+                <input required value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                  className="mt-1 w-full bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#B563FA]/50" />
+              </div>
+              <div>
+                <label className="text-[11px] font-mono uppercase tracking-wide text-[#A99BC4]">Email</label>
+                <input required type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                  className="mt-1 w-full bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm outline-none focus:border-[#B563FA]/50" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-mono uppercase tracking-wide text-[#A99BC4]">Department</label>
+                  <select value={editForm.department} onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
+                    className="mt-1 w-full bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm">
+                    {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-mono uppercase tracking-wide text-[#A99BC4]">Role</label>
+                  <select value={editForm.role} onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
+                    className="mt-1 w-full bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm">
+                    {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-mono uppercase tracking-wide text-[#A99BC4]">Joining Date</label>
+                  <input type="date" value={editForm.joiningDate} onChange={(e) => setEditForm((f) => ({ ...f, joiningDate: e.target.value }))}
+                    className="mt-1 w-full bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-mono uppercase tracking-wide text-[#A99BC4]">Project</label>
+                  <select value={editForm.projectId} onChange={(e) => setEditForm((f) => ({ ...f, projectId: e.target.value }))}
+                    className="mt-1 w-full bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm">
+                    <option value="">Unassigned</option>
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-mono uppercase tracking-wide text-[#A99BC4]">Employment Status</label>
+                <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}
+                  className="mt-1 w-full bg-[#000000] border border-[#2E1F47] rounded-lg px-3 py-2 text-sm">
+                  <option>Active</option>
+                  <option>Inactive</option>
+                </select>
+              </div>
+              {editError && <div className="text-xs text-rose-300 border border-rose-400/30 bg-rose-400/10 rounded px-2 py-1.5">{editError}</div>}
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setEditingEmployee(null)} className="text-sm px-3 py-1.5 rounded-lg border border-[#2E1F47] text-[#A99BC4] hover:text-[#F3EEFB]">Cancel</button>
+                <button type="submit" disabled={editSubmitting} className="text-sm px-3 py-1.5 rounded-lg bg-[#B563FA]/15 border border-[#B563FA]/40 text-[#B563FA] hover:bg-[#B563FA]/25 inline-flex items-center gap-1.5 disabled:opacity-50">
+                  {editSubmitting && <Loader2 size={13} className="animate-spin" />} Save
                 </button>
               </div>
             </form>

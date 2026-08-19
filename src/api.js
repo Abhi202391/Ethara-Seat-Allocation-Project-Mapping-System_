@@ -72,6 +72,17 @@ export const api = {
       })
     ),
 
+  updateEmployee: async (id, payload) =>
+    normalizeEmployee(
+      await request(`/employees/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+    ),
+
+  deactivateEmployee: async (id) =>
+    normalizeEmployee(await request(`/employees/${id}`, { method: "DELETE" })),
+
   importEmployeesCsv: async (file) => {
     const form = new FormData();
     form.append("file", file);
