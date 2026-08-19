@@ -1,8 +1,9 @@
+import re
 from datetime import date
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlalchemy import case, func
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from . import models, schemas
@@ -117,20 +118,32 @@ def list_employees(
     page_size: int,
 ):
     query = db.query(models.Employee)
+    needs_seat_join = bool(search) or status_filter in ("Pending", "Allocated")
+    if needs_seat_join:
+        query = query.outerjoin(models.Seat, models.Seat.employee_id == models.Employee.id)
+
     if search:
         like = f"%{search.lower()}%"
-        query = query.outerjoin(models.Project, models.Employee.project_id == models.Project.id).filter(
-            func.lower(models.Employee.name).like(like)
-            | func.lower(models.Employee.employee_code).like(like)
-            | func.lower(models.Employee.email).like(like)
-            | func.lower(models.Project.name).like(like)
-        )
+        search_lower = search.lower()
+        query = query.outerjoin(models.Project, models.Employee.project_id == models.Project.id)
+        conditions = [
+            func.lower(models.Employee.name).like(like),
+            func.lower(models.Employee.employee_code).like(like),
+            func.lower(models.Employee.email).like(like),
+            func.lower(models.Project.name).like(like),
+        ]
+        floor_match = re.search(r"floor\s*(\d+)", search_lower)
+        if floor_match:
+            conditions.append(models.Seat.floor == int(floor_match.group(1)))
+        zone_match = re.search(r"zone\s*([a-z0-9]+)", search_lower)
+        if zone_match:
+            conditions.append(func.lower(models.Seat.zone) == zone_match.group(1))
+        query = query.filter(or_(*conditions))
+
     if status_filter == "Pending":
-        query = query.outerjoin(models.Seat, models.Seat.employee_id == models.Employee.id).filter(
-            models.Seat.id.is_(None)
-        )
+        query = query.filter(models.Seat.id.is_(None))
     elif status_filter == "Allocated":
-        query = query.join(models.Seat, models.Seat.employee_id == models.Employee.id)
+        query = query.filter(models.Seat.id.isnot(None))
 
     total = query.count()
     items = (

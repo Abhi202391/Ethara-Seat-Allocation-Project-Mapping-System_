@@ -458,7 +458,7 @@ export default function EtheraSeatDemo() {
                 <input
                   value={empQuery}
                   onChange={(e) => { setEmpQuery(e.target.value); setPage(0); }}
-                  placeholder="Search by name, ID, email, project…"
+                  placeholder="Search by name, ID, email, project, or 'floor 3' / 'zone A'…"
                   className="bg-transparent outline-none text-sm w-full placeholder:text-[#7A6B96]"
                 />
               </div>
