@@ -85,9 +85,32 @@ minimums:
 Re-running the script drops and recreates all tables (useful to reset to a
 clean demo state).
 
+## Authentication
+
+Two roles: **Manager** (full access — add/edit/deactivate employees,
+allocate/release seats, import CSV, view the audit History tab) and
+**Employee** (read-only — can browse and search the entire directory, but
+no action buttons; the backend rejects mutating requests from an Employee
+token with `403` regardless of what the UI shows).
+
+Demo accounts (seeded by `python -m app.seed`, or click the quick-fill
+buttons on the login screen):
+
+| Role | Email | Password |
+|---|---|---|
+| Manager | `manager@ethara.ai` | `Manager@123` |
+| Employee | `employee@ethara.ai` | `Employee@123` (linked to the first seeded employee) |
+
+Auth is a bearer JWT (`POST /auth/login`, 12h expiry), password hashing is
+PBKDF2-SHA256 via the stdlib (`backend/app/security.py` — chosen over
+bcrypt to avoid a native-build dependency on Windows).
+
 ## API endpoints
 
-All endpoints from the assessment spec are implemented:
+All endpoints from the assessment spec are implemented (all require a
+valid bearer token; mutating routes additionally require `role=manager`):
+
+**Auth:** `POST /auth/login` · `GET /auth/me`
 
 **Employees:** `POST /employees` · `GET /employees` (search, status, page,
 page_size) · `GET /employees/{id}` · `PUT /employees/{id}` · `DELETE
@@ -142,14 +165,14 @@ the same DB-backed lookups as tools/functions.
 ## What's implemented vs. not
 
 **Implemented:** full CRUD-backed employee/project/seat management, seat
-allocation/release with proximity + alternate-zone fallback, dashboard
-aggregation, search/filter (server-side, paginated for 5,000 rows), New
-Joiner form with auto-allocation, optional CSV bulk-import, rule-based AI
-assistant, Swagger API docs.
+allocation/release with proximity + alternate-zone fallback, interactive
+seat picker, dashboard aggregation, search/filter (server-side, paginated
+for 5,000 rows), New Joiner form with auto-allocation, optional CSV
+bulk-import, rule-based AI assistant, seat_allocations audit trail with a
+History tab, Manager/Employee authentication with role-based access
+control, Swagger API docs.
 
 **Not implemented (out of scope for this pass):**
-- Authentication / role-based access (HR vs. Admin vs. Employee) — the spec
-  doesn't strictly require it and none was requested.
 - A production Postgres deployment — SQLite is used, which the spec
   explicitly allows for a local/demo deployment. Swapping to Postgres only
   requires changing `DATABASE_URL` in `backend/app/database.py` (SQLAlchemy
