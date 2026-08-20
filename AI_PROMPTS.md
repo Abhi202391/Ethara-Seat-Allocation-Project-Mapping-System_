@@ -212,6 +212,107 @@ oversight. See `README.md` for the manual steps.
 
 ---
 
+## Prompt Flow (§10 of the assessment)
+
+The assessment's §10 template asks for this exact 10-stage breakdown
+(Architecture / Database / Backend APIs / Seat Allocation Logic / AI
+Assistant / Frontend / Testing / Debugging / Deployment / Refactoring),
+which is more granular than the 7 categories §9 asks for above. Three of
+the ten don't map cleanly onto anything already written above — Seat
+Allocation Logic, Testing, and Refactoring — so those get their own
+treatment here; the rest cross-reference the matching section.
+
+**Prompt 1 – Architecture** → see *"Prompt used for planning"* above.
+Driven by "Add other packages so that this application can go live" and
+the PDF-audit-derived "whatever the coding part is remaining implement in
+this application" — the architecture (React/Vite/Tailwind frontend,
+FastAPI/SQLAlchemy/SQLite backend, REST over fetch) was a direct
+consequence of the spec's recommended stack section, not an independent
+design exercise.
+
+**Prompt 2 – Database** → see *"Prompt used for database design"* above.
+
+**Prompt 3 – Backend APIs** → see *"Prompt used for backend"* above.
+
+**Prompt 4 – Seat Allocation Logic**
+
+> "Check this and implement this if not implemented: 3.3 Seat Allocation"
+
+> "Check these features if not available add them: 3.4 New Joiner
+> Allocation"
+
+> "where is system suggesting 'available seats'" → "yes add interactive
+> picker"
+
+> "Are these requirements fulfilled: [8. Core Business Rules — one seat
+> per employee, one employee per seat, released seats reopen, reserved
+> seats excluded, project-proximity priority, no duplicate email, no
+> duplicate seat number, dashboard live-updates]"
+
+This is the single most iterated-on piece of logic in the codebase
+(`crud.py`'s `allocate_seat`, `suggest_seats`, `_commit_allocation`,
+`release_seat`). It went through three real passes: first the base
+proximity/fallback algorithm, then surfacing the alternate-zone note that
+algorithm already computed but never returned to the caller, then
+refactoring the single auto-picked seat into a ranked list of suggestions
+so a specific one could be chosen and allocated instead of always taking
+the top match. All 8 business rules were re-verified afterward with live
+round-trip tests (allocate an already-seated employee → 400; allocate a
+seat someone else just took → 409; allocate then release → seat reopens;
+try to allocate a Reserved seat directly → 409).
+
+**Prompt 5 – AI Assistant** → see *"Prompt used for AI assistant"* above.
+
+**Prompt 6 – Frontend** → see *"Prompt used for frontend"* above.
+
+**Prompt 7 – Testing**
+
+> "Is these API requirements fulfilled: [Employee / Project / Seat /
+> Dashboard / AI Assistant APIs]"
+
+> "Are these technology requirements fulfilled, if not what tech stack is
+> used?"
+
+> "Are these requirements fulfilled: [Core Business Rules]"
+
+Testing in this project was never a separate phase done once at the end —
+it was the mechanism used to answer nearly every "is X done" prompt in
+this session. The pattern was consistent: hit the real endpoint with
+`curl` (not read the code and assume), inspect the actual HTTP status and
+JSON body, and for anything with a UI component, also drive the browser
+(click through tabs, fill real form fields, read back the rendered DOM
+text) rather than trust that a passing API call implies a working UI. Every
+mutating test used a disposable record — a temp project, a temp seat, a
+throwaway employee — cleaned up with a targeted SQL delete afterward so
+the live dataset (including the real "Anshu" record found mid-session)
+was never left in a test-mutated state.
+
+**Prompt 8 – Debugging** → see *"Prompt used for debugging"* above.
+
+**Prompt 9 – Deployment** → see *"Prompt used for deployment"* above.
+
+**Prompt 10 – Refactoring**
+
+No prompt in this session used the word "refactor" — every restructuring
+was a side effect of a feature request, not a standalone cleanup pass.
+Concrete examples:
+- `allocate_seat`'s seat-commit logic was pulled into a shared
+  `_commit_allocation` helper when the interactive-picker feature needed
+  the same "mark seat occupied, write the allocation record" logic to run
+  from two different entry points (auto-pick vs. an explicit `seat_id`).
+- Seat queries gained `joinedload(Seat.employee)` after adding
+  `employee_name` to seat responses would otherwise have triggered an
+  N+1 query per seat — up to 1,120 extra queries for a single floor.
+  Caught by timing the endpoint (~360ms for a full floor) rather than
+  assuming the eager-load annotation alone was sufficient.
+- The Employees tab's search/pagination moved from filtering a full
+  client-side array (fine at the original 320 fake employees) to
+  server-side `search`/`page`/`page_size` query params once the dataset
+  became 5,000 real rows — a straight port would have shipped a
+  5,000-row JSON blob to the browser on every keystroke.
+
+---
+
 ## What AI generated correctly
 
 - Every backend endpoint added across the whole session was exercised with
