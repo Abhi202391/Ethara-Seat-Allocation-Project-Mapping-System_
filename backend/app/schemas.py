@@ -4,6 +4,27 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+    employee_id: Optional[int] = None
+    name: str
+
+
+class MeResponse(BaseModel):
+    id: int
+    email: str
+    role: str
+    employee_id: Optional[int] = None
+    name: str
+
+
 class ProjectBase(BaseModel):
     name: str
     description: Optional[str] = ""

@@ -6,7 +6,22 @@ from fastapi import HTTPException
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from . import models, schemas
+from . import models, schemas, security
+
+
+# ---------------- Auth ----------------
+
+def authenticate_user(db: Session, email: str, password: str) -> Optional[models.User]:
+    user = db.query(models.User).filter(models.User.email == email.lower()).first()
+    if not user or not security.verify_password(password, user.password_salt, user.password_hash):
+        return None
+    return user
+
+
+def display_name(user: models.User) -> str:
+    if user.employee:
+        return user.employee.name
+    return "Manager" if user.role == "manager" else user.email
 
 
 # ---------------- Projects ----------------

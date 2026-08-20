@@ -16,7 +16,12 @@ import random
 from datetime import date, timedelta
 
 from .database import Base, SessionLocal, engine
-from . import models
+from . import models, security
+
+DEMO_MANAGER_EMAIL = "manager@ethara.ai"
+DEMO_MANAGER_PASSWORD = "Manager@123"
+DEMO_EMPLOYEE_EMAIL = "employee@ethara.ai"
+DEMO_EMPLOYEE_PASSWORD = "Employee@123"
 
 FIRST_NAMES = [
     "Amit", "Priya", "Rahul", "Sneha", "Vikram", "Anjali", "Rohan", "Kavya", "Arjun", "Divya",
@@ -163,6 +168,19 @@ def run(seed: int = 42):
 
         db.commit()
 
+        # ---- demo auth accounts ----
+        first_employee = db.query(models.Employee).order_by(models.Employee.id).first()
+        mgr_hash, mgr_salt = security.hash_password(DEMO_MANAGER_PASSWORD)
+        db.add(models.User(
+            email=DEMO_MANAGER_EMAIL, password_hash=mgr_hash, password_salt=mgr_salt, role="manager",
+        ))
+        emp_hash, emp_salt = security.hash_password(DEMO_EMPLOYEE_PASSWORD)
+        db.add(models.User(
+            email=DEMO_EMPLOYEE_EMAIL, password_hash=emp_hash, password_salt=emp_salt, role="employee",
+            employee_id=first_employee.id if first_employee else None,
+        ))
+        db.commit()
+
         total_seats = len(seats)
         available = sum(1 for s in seats if s.status == "Available")
         reserved = sum(1 for s in seats if s.status == "Reserved")
@@ -173,6 +191,11 @@ def run(seed: int = 42):
             f"across {len(FLOORS)} floors x {len(ZONES)} zones, {len(projects)} projects.\n"
             f"Seat status -> available: {available}, occupied: {occupied}, "
             f"reserved: {reserved}, maintenance: {maintenance}"
+        )
+        print(
+            f"Demo accounts -> Manager: {DEMO_MANAGER_EMAIL} / {DEMO_MANAGER_PASSWORD} | "
+            f"Employee: {DEMO_EMPLOYEE_EMAIL} / {DEMO_EMPLOYEE_PASSWORD} "
+            f"(linked to {first_employee.name if first_employee else 'n/a'})"
         )
     finally:
         db.close()

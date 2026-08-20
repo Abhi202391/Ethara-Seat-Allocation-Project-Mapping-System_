@@ -74,3 +74,17 @@ class SeatAllocation(Base):
     employee = relationship("Employee", foreign_keys=[employee_id])
     seat = relationship("Seat", foreign_keys=[seat_id])
     project = relationship("Project", foreign_keys=[project_id])
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    password_salt = Column(String, nullable=False)
+    role = Column(String, nullable=False)  # "manager" | "employee"
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    employee = relationship("Employee", foreign_keys=[employee_id])

@@ -1,10 +1,27 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const TOKEN_KEY = "ethara_token";
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
 
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
+  const token = getToken();
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+
+  if (res.status === 401) {
+    setToken(null);
+    window.dispatchEvent(new Event("ethara:unauthorized"));
+  }
+
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -87,10 +104,29 @@ export const api = {
   importEmployeesCsv: async (file) => {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${BASE_URL}/employees/import-csv`, { method: "POST", body: form });
+    const token = getToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${BASE_URL}/employees/import-csv`, { method: "POST", body: form, headers });
+    if (res.status === 401) {
+      setToken(null);
+      window.dispatchEvent(new Event("ethara:unauthorized"));
+    }
     if (!res.ok) throw new Error("CSV import failed");
     return res.json();
   },
+
+  login: async (email, password) => {
+    const data = await request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    setToken(data.access_token);
+    return { role: data.role, employeeId: data.employee_id, name: data.name };
+  },
+
+  me: async () => {
+    const data = await request("/auth/me");
+    return { id: data.id, email: data.email, role: data.role, employeeId: data.employee_id, name: data.name };
+  },
+
+  logout: () => setToken(null),
 
   listSeats: async ({ floor, zone, status } = {}) => {
     const params = new URLSearchParams();

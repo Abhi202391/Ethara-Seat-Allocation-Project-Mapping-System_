@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search, MapPin, Users, Briefcase, MessageSquare,
   CheckCircle2, Clock, AlertTriangle, LayoutGrid,
-  UserPlus, X, Send, Plus, Upload, Loader2, Pencil, Ban, ListChecks, History
+  UserPlus, X, Send, Plus, Upload, Loader2, Pencil, Ban, ListChecks, History, LogOut
 } from "lucide-react";
-import { api } from "./api";
+import { api, getToken } from "./api";
+import Login from "./Login";
 
 const DEPARTMENTS = ["Engineering", "QA", "Product", "Design", "Data", "DevOps", "Support", "HR", "Finance", "Sales"];
 const ROLES = [
@@ -45,6 +46,10 @@ function Card({ label, value, icon: Icon, tint, loading }) {
 }
 
 export default function EtheraSeatDemo() {
+  const [session, setSession] = useState(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const isManager = session?.role === "manager";
+
   const [tab, setTab] = useState("dashboard");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -177,26 +182,56 @@ export default function EtheraSeatDemo() {
   }
 
   useEffect(() => {
-    loadProjects();
-    loadDashboard();
+    async function restoreSession() {
+      if (getToken()) {
+        try {
+          setSession(await api.me());
+        } catch {
+          api.logout();
+        }
+      }
+      setAuthChecking(false);
+    }
+    restoreSession();
+
+    function handleUnauthorized() {
+      setSession(null);
+    }
+    window.addEventListener("ethara:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("ethara:unauthorized", handleUnauthorized);
   }, []);
 
+  function logout() {
+    api.logout();
+    setSession(null);
+  }
+
   useEffect(() => {
+    if (!session) return;
+    loadProjects();
+    loadDashboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
     const t = setTimeout(loadEmployees, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empQuery, empStatusFilter, page]);
+  }, [session, empQuery, empStatusFilter, page]);
 
   useEffect(() => {
+    if (!session) return;
     loadSeats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seatFloorFilter, seatZoneFilter, seatStatusFilter]);
+  }, [session, seatFloorFilter, seatZoneFilter, seatStatusFilter]);
 
   useEffect(() => {
+    if (!session || !isManager) return;
     const t = setTimeout(loadHistory, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyQuery, historyStatusFilter, historyPage]);
+  }, [session, isManager, historyQuery, historyStatusFilter, historyPage]);
 
   async function allocateSeat(employeeId, seatId = null) {
     const { note } = await api.allocateSeat(employeeId, seatId);
@@ -377,9 +412,21 @@ export default function EtheraSeatDemo() {
     { id: "employees", label: "Employees", icon: Users },
     { id: "seats", label: "Seat Map", icon: MapPin },
     { id: "projects", label: "Projects", icon: Briefcase },
-    { id: "history", label: "History", icon: History },
+    ...(isManager ? [{ id: "history", label: "History", icon: History }] : []),
     { id: "ai", label: "AI Assistant", icon: MessageSquare },
   ];
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#000000] text-[#A99BC4] font-sans flex items-center justify-center">
+        <Loader2 size={20} className="animate-spin" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Login onLogin={setSession} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#000000] text-[#F3EEFB] font-sans">
@@ -390,9 +437,18 @@ export default function EtheraSeatDemo() {
             <div className="text-[11px] font-mono tracking-[0.25em] text-[#B563FA] uppercase">Ethara · Facilities</div>
             <h1 className="text-lg font-semibold tracking-tight text-[#B563FA]">Seat Allocation &amp; Project Mapping</h1>
           </div>
-          <div className="hidden sm:flex items-center gap-1 text-[11px] font-mono text-[#A99BC4] border border-[#2E1F47] rounded px-2 py-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-            live API · {summary ? summary.totalEmployees : "…"} employees · {summary ? summary.totalSeats : "…"} seats
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-1 text-[11px] font-mono text-[#A99BC4] border border-[#2E1F47] rounded px-2 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+              live API · {summary ? summary.totalEmployees : "…"} employees · {summary ? summary.totalSeats : "…"} seats
+            </div>
+            <div className="flex items-center gap-1 text-[11px] font-mono text-[#A99BC4] border border-[#2E1F47] rounded px-2 py-1">
+              <span className="text-[#F3EEFB]">{session.name}</span>
+              <span className="text-[#7A6B96]">· {isManager ? "Manager" : "Employee"}</span>
+            </div>
+            <button onClick={logout} className="p-1.5 rounded border border-[#2E1F47] text-[#A99BC4] hover:text-rose-300 hover:border-rose-400/50" title="Log out">
+              <LogOut size={14} />
+            </button>
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-5 flex gap-1 overflow-x-auto">
@@ -502,20 +558,24 @@ export default function EtheraSeatDemo() {
                 <option>Allocated</option>
                 <option>Pending</option>
               </select>
-              <button
-                onClick={openAddModal}
-                className="text-sm font-mono px-3 py-2 rounded-lg border border-[#B563FA]/40 text-[#B563FA] hover:bg-[#B563FA]/10 inline-flex items-center gap-1.5 whitespace-nowrap"
-              >
-                <Plus size={15} /> Add Employee
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={csvBusy}
-                className="text-sm font-mono px-3 py-2 rounded-lg border border-[#2E1F47] text-[#A99BC4] hover:text-[#F3EEFB] hover:border-[#B563FA]/50 inline-flex items-center gap-1.5 whitespace-nowrap disabled:opacity-50"
-              >
-                {csvBusy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Import CSV
-              </button>
-              <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvSelected} />
+              {isManager && (
+                <>
+                  <button
+                    onClick={openAddModal}
+                    className="text-sm font-mono px-3 py-2 rounded-lg border border-[#B563FA]/40 text-[#B563FA] hover:bg-[#B563FA]/10 inline-flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <Plus size={15} /> Add Employee
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={csvBusy}
+                    className="text-sm font-mono px-3 py-2 rounded-lg border border-[#2E1F47] text-[#A99BC4] hover:text-[#F3EEFB] hover:border-[#B563FA]/50 inline-flex items-center gap-1.5 whitespace-nowrap disabled:opacity-50"
+                  >
+                    {csvBusy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Import CSV
+                  </button>
+                  <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvSelected} />
+                </>
+              )}
             </div>
 
             {csvMessage && (
@@ -558,23 +618,27 @@ export default function EtheraSeatDemo() {
                         </td>
                         <td className="px-3 py-2"><StatusBadge status={seat ? "Occupied" : "Pending"} /></td>
                         <td className="px-3 py-2 text-right">
-                          <div className="flex justify-end flex-wrap gap-1">
-                            {seat ? (
-                              <button onClick={() => releaseSeat(e.id)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-rose-400/50 hover:text-rose-300 inline-flex items-center gap-1">
-                                <X size={12} /> Release
+                          {isManager ? (
+                            <div className="flex justify-end flex-wrap gap-1">
+                              {seat ? (
+                                <button onClick={() => releaseSeat(e.id)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-rose-400/50 hover:text-rose-300 inline-flex items-center gap-1">
+                                  <X size={12} /> Release
+                                </button>
+                              ) : (
+                                <button onClick={() => openSeatPicker({ mode: "allocate", employeeId: e.id, employeeName: e.name, projectId: e.projectId })} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-emerald-400/50 hover:text-emerald-300 inline-flex items-center gap-1">
+                                  <UserPlus size={12} /> Allocate
+                                </button>
+                              )}
+                              <button onClick={() => openEditModal(e)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-[#B563FA]/50 hover:text-[#B563FA] inline-flex items-center gap-1">
+                                <Pencil size={12} /> Edit
                               </button>
-                            ) : (
-                              <button onClick={() => openSeatPicker({ mode: "allocate", employeeId: e.id, employeeName: e.name, projectId: e.projectId })} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-emerald-400/50 hover:text-emerald-300 inline-flex items-center gap-1">
-                                <UserPlus size={12} /> Allocate
+                              <button onClick={() => deactivateEmployee(e)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-rose-400/50 hover:text-rose-300 inline-flex items-center gap-1">
+                                <Ban size={12} /> Deactivate
                               </button>
-                            )}
-                            <button onClick={() => openEditModal(e)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-[#B563FA]/50 hover:text-[#B563FA] inline-flex items-center gap-1">
-                              <Pencil size={12} /> Edit
-                            </button>
-                            <button onClick={() => deactivateEmployee(e)} className="text-[11px] font-mono px-2 py-1 rounded border border-[#2E1F47] hover:border-rose-400/50 hover:text-rose-300 inline-flex items-center gap-1">
-                              <Ban size={12} /> Deactivate
-                            </button>
-                          </div>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-[#7A6B96] font-mono">view only</span>
+                          )}
                         </td>
                       </tr>
                     );
