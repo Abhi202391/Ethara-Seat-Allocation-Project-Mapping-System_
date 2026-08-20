@@ -19,9 +19,6 @@ taken from that session in order; nothing is reconstructed after the fact.
 
 > "Add other packages so that this application can go live."
 
-> Uploaded `Vibe Coding Assessment_ Ethara Seat Allocation & Project Mapping
-> System.pdf`, then: **"CHECK from this document."**
-
 > "whatever the coding part is remaining implement in this application. If
 > any thing remain guide me how to do it."
 
@@ -29,7 +26,7 @@ The AI's planning method throughout was **audit-then-build**, repeated
 dozens of times rather than done once up front: read the actual spec
 section, re-read the actual current code (never answered from memory),
 report a gap table (✅/⚠️/❌), then only build what was missing. The initial
-full-project plan came from the PDF audit above, which found the app was
+full-project plan came from the instruction provided, which found the app was
 frontend-only — no backend, no database, seed data at 320 employees against
 a 5,000 minimum — and became the backlog for every subsequent session. Later
 planning was feature-scoped, each driven by a spec-section prompt, e.g.:
