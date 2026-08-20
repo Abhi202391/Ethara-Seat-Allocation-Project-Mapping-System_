@@ -295,8 +295,8 @@ export default function EtheraSeatDemo() {
     setAiInput("");
     setAiBusy(true);
     try {
-      const answer = await api.aiQuery(q);
-      setAiLog((log) => [...log, { role: "assistant", text: answer }]);
+      const { answer, engine } = await api.aiQuery(q);
+      setAiLog((log) => [...log, { role: "assistant", text: answer, engine }]);
     } catch (err) {
       setAiLog((log) => [...log, { role: "assistant", text: `Sorry, I hit an error reaching the assistant: ${err.message}` }]);
     } finally {
@@ -814,7 +814,7 @@ export default function EtheraSeatDemo() {
         {tab === "ai" && (
           <div className="rounded-lg border border-[#2E1F47] bg-[#000000] flex flex-col h-[65vh]">
             <div className="px-4 py-3 border-b border-[#241934] text-[11px] uppercase tracking-widest text-[#A99BC4] font-mono flex items-center gap-2">
-              <MessageSquare size={14} className="text-[#B563FA]" /> Seat &amp; Project Assistant (backend-powered)
+              <MessageSquare size={14} className="text-[#B563FA]" /> Seat &amp; Project Assistant
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
               {aiLog.map((m, i) => (
@@ -826,6 +826,11 @@ export default function EtheraSeatDemo() {
                   }`}>
                     {m.text}
                   </div>
+                  {m.engine && (
+                    <div className={`text-[10px] font-mono mt-1 uppercase tracking-wide ${m.engine === "llm" ? "text-[#B563FA]" : "text-[#7A6B96]"}`}>
+                      {m.engine === "llm" ? "via OpenAI" : "via rule-based fallback"}
+                    </div>
+                  )}
                 </div>
               ))}
               {aiBusy && (

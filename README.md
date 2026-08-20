@@ -48,6 +48,7 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate        # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+cp .env.example .env          # optional — add OPENAI_API_KEY here for the real LLM assistant
 python -m app.seed            # creates ethara.db and seeds it (run once, or to reset)
 uvicorn app.main:app --reload --port 8000
 ```
@@ -152,15 +153,30 @@ Full request/response schemas: http://localhost:8000/docs
 
 ## AI Assistant
 
-`POST /ai/query` implements the assessment's minimum requirement (natural
-language "where is X seated" style answers) plus available-seat lookups,
-project occupancy, neighbour lookups, and pending-allocation prompts. It's a
-keyword/regex-based parser rather than an LLM call — the spec explicitly
-allows this fallback when no AI API is wired up ("If the AI API is not
-available, candidates can build a fallback keyword-based assistant"). To
-upgrade to a real LLM, swap the body of `answer_query()` in
-`backend/app/ai_assistant.py` for a call to OpenAI/Claude/Gemini, passing it
-the same DB-backed lookups as tools/functions.
+`POST /ai/query` answers natural-language questions about seats, projects,
+and allocation status. Two engines:
+
+- **LLM (real AI)** — when `OPENAI_API_KEY` is set (`backend/.env`, see
+  `backend/.env.example`), `backend/app/llm_assistant.py` calls OpenAI
+  (`gpt-4o-mini` by default, override via `OPENAI_MODEL`) using
+  function-calling: the model is given tools like `find_employee_seat`,
+  `available_seats`, `project_occupancy`, and `neighbours`, each backed by a
+  real database query. This grounds every answer in actual data — the model
+  can't hallucinate a seat number — while understanding phrasing far more
+  flexibly than a fixed parser (e.g. "Can you tell me if Priya has a desk
+  yet and which team she's on?" with no fixed pattern to match).
+- **Rule-based fallback** — `backend/app/ai_assistant.py`, a keyword/regex
+  parser. Used automatically whenever no API key is configured, or if the
+  OpenAI call itself fails for any reason (network, auth, rate limit) — the
+  request never errors out, it just answers with the simpler engine. This is
+  also what the spec explicitly allows when no AI API is available ("If the
+  AI API is not available, candidates can build a fallback keyword-based
+  assistant").
+
+Every `/ai/query` response includes `"engine": "llm" | "rule-based"` so the
+frontend (and you) can see which one actually answered — the AI Assistant
+tab shows a small "via OpenAI" / "via rule-based fallback" tag under each
+answer.
 
 ## What's implemented vs. not
 

@@ -1,15 +1,22 @@
 import csv
 import io
+import logging
 from datetime import date
 from typing import List, Optional
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
-from . import ai_assistant, crud, models, schemas, security
+from . import ai_assistant, crud, llm_assistant, models, schemas, security
 from .database import Base, engine, get_db
+
+logger = logging.getLogger("ethara")
 
 Base.metadata.create_all(bind=engine)
 
@@ -266,5 +273,11 @@ def dashboard_floor_utilization(db: Session = Depends(get_db), _: models.User = 
 
 @app.post("/ai/query", response_model=schemas.AIQueryResponse)
 def ai_query(payload: schemas.AIQueryRequest, db: Session = Depends(get_db), _: models.User = Depends(get_current_user)):
+    if llm_assistant.is_available():
+        try:
+            answer = llm_assistant.answer_query_llm(db, payload.query)
+            return schemas.AIQueryResponse(answer=answer, engine="llm")
+        except Exception:
+            logger.exception("OpenAI call failed, falling back to rule-based assistant")
     answer = ai_assistant.answer_query(db, payload.query)
-    return schemas.AIQueryResponse(answer=answer)
+    return schemas.AIQueryResponse(answer=answer, engine="rule-based")

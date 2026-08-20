@@ -186,3 +186,4 @@ class AIQueryRequest(BaseModel):
 
 class AIQueryResponse(BaseModel):
     answer: str
+    engine: str = "rule-based"  # "llm" | "rule-based"

@@ -215,5 +215,8 @@ export const api = {
     return rows.map((r) => ({ floor: r.floor, total: r.total, occupied: r.occupied, pct: r.pct }));
   },
 
-  aiQuery: async (query) => (await request("/ai/query", { method: "POST", body: JSON.stringify({ query } ) })).answer,
+  aiQuery: async (query) => {
+    const data = await request("/ai/query", { method: "POST", body: JSON.stringify({ query }) });
+    return { answer: data.answer, engine: data.engine };
+  },
 };
